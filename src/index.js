@@ -9,20 +9,103 @@ app.use(cors());
 
 const users = [];
 
+/**
+ * @returns Esse middleware é responsável por receber o username do usuário pelo header e validar se existe ou não um usuário com o username passado. Caso exista, o usuário deve ser repassado para o request e a função next deve ser chamada.
+ */
 function checksExistsUserAccount(request, response, next) {
-  // Complete aqui
+  // Pegando o username que veio pelo header da aplicação
+  const { username } = request.headers;
+
+  // Verificando se o username passado no header existe no array de users
+  const user = users.find(user => user.username === username)
+
+  // Se NÃO existir, retornar erro 404
+  if (!user) {
+    return response.status(404).json({ error: 'User not found' })
+  }
+
+  // Atribuindo o usuario ao request
+  request.user = user;
+
+  // Passando para frente com middleware
+  return next()
+
 }
 
+/**
+ * @returns Esse middleware é responsável por receber o username do usuário pelo header e validar se existe ou não um usuário com o username passado. Caso exista, o usuário deve ser repassado para o request e a função next deve ser chamada.
+ */
 function checksCreateTodosUserAvailability(request, response, next) {
-  // Complete aqui
+  // Pegando user do request
+  const { user } = request;
+
+  /**
+   * Se nao for PRO e:
+   * os TODOS forem menores que 10 OU :
+   * o user for PRO, passe para frente via middleware
+   */
+
+  if ((user.pro === false && user.todos.length < 10) || user.pro === true) {
+    return next();
+  }
+
+  return response.status(403).json({ error: 'Free plan limit reached. Please upgrade to pro.' });
 }
 
+/**
+ * @returns Esse middleware deve receber o **username** de dentro do header e o **id** de um *todo* de dentro de `request.params`. Você deve validar o usuário, validar que o `id` seja um uuid e também validar que esse `id` pertence a um *todo* do usuário informado.
+
+Com todas as validações passando, o *todo* encontrado deve ser passado para o `request` assim como o usuário encontrado também e a função next deve ser chamada.
+ */
 function checksTodoExists(request, response, next) {
-  // Complete aqui
+  const { username } = request.headers;
+  const { id } = request.params;
+
+  const user = users.find((user) => {
+    return user.username === username
+  });
+
+  if (!user) {
+    return response.status(404).json({ error: 'User not found.' });
+  }
+
+  if (!validate(id)) {
+    return response.status(400).json({ error: 'The provided id is not a uuid.' });
+  }
+
+  const todo = user.todos.find((todo) => {
+    return todo.id === id
+  });
+
+  if (!todo) {
+    return response.status(404).json({ error: "User's todo not found." });
+  }
+
+  request.todo = todo;
+  request.user = user;
+
+  return next();
 }
 
+/**
+ * Esse middleware possui um funcionamento semelhante ao middleware checksExistsUserAccount mas a busca pelo usuário deve ser feita através do id de um usuário passado por parâmetro na rota. Caso o usuário tenha sido encontrado, o mesmo deve ser repassado para dentro do request.user e a função next deve ser chamada.
+ */
 function findUserById(request, response, next) {
-  // Complete aqui
+  const { id } = request.params;
+
+  const user = users.find((user) => {
+    return user.id === id
+  });
+
+  if (!user) {
+    return response.status(404).json({ error: 'User not found.' });
+  }
+
+  request.user = user;
+
+  return next();
+
+
 }
 
 app.post('/users', (request, response) => {
